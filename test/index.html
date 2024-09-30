@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chunked File Upload</title>
+</head>
+
+<body>
+    <h1>Chunked File Upload Test</h1>
+    <input type="file" id="fileInput" />
+    <button onclick="startUpload()">Upload</button>
+    <div id="progress"></div>
+
+    <script>
+        function startUpload() {
+            const file = document.getElementById('fileInput').files[0];
+            if (file) {
+                uploadFileInChunks(file);
+            } else {
+                alert('Please select a file');
+            }
+        }
+
+        function uploadFileInChunks(file) {
+            const chunkSize = 1024 * 1024; // 1MB per chunk
+            let currentChunk = 0;
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            const progressElement = document.getElementById('progress');
+
+            function sendChunk() {
+                const resumableChunkNumber = currentChunk + 1;
+                const resumableChunkSize = chunkSize;
+                const resumableCurrentChunkSize = Math.min(resumableChunkSize, file.size - (currentChunk * resumableChunkSize));
+                const resumableTotalSize = file.size;
+                const resumableType = file.type;
+                const resumableIdentifier = `${file.name}-${file.size}-${file.lastModified}`;
+                const resumableFilename = file.name;
+                const resumableRelativePath = file.webkitRelativePath || file.name;
+                const resumableTotalChunks = totalChunks;
+
+                // Removed redundant 'file' declaration
+                const formData = new FormData();
+                const chunk = file.slice(currentChunk * chunkSize, (currentChunk + 1) * chunkSize);
+                formData.append('file', chunk);
+                formData.append('resumableChunkNumber', resumableChunkNumber);
+                formData.append('resumableChunkSize', resumableChunkSize);
+                formData.append('resumableCurrentChunkSize', resumableCurrentChunkSize);
+                formData.append('resumableTotalSize', resumableTotalSize);
+                formData.append('resumableType', resumableType);
+                formData.append('resumableIdentifier', resumableIdentifier);
+                formData.append('resumableFilename', resumableFilename);
+                formData.append('resumableRelativePath', resumableRelativePath);
+                formData.append('resumableTotalChunks', resumableTotalChunks);
+                formData.append('chunkIndex', currentChunk);
+                formData.append('totalChunks', totalChunks);
+                formData.append('fileName', file.name);
+
+                fetch('http://127.0.0.1:8000/api/v1/file/uploadChunk', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Authorization': 'Bearer ' + '86|WgDlkEXhGDnuRibVuAHKzJRSuBLgkuVHTKRANpmk0c5d991a'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'error') {
+                            console.error('Upload error:', data.message);
+                            return;
+                        }
+                        progressElement.innerText = `Uploading chunk ${currentChunk + 1} of ${totalChunks}...`;
+
+                        if (currentChunk < totalChunks - 1) {
+                            currentChunk++;
+                            sendChunk(); // Continue sending the next chunk
+                        } else {
+                            progressElement.innerText = 'Upload complete!';
+                        }
+                    })
+                    .catch(error => console.error('Upload failed:', error));
+            }
+
+            sendChunk(); // Start the chunked upload process
+        }
+
+    </script>
+</body>
+
+</html>
